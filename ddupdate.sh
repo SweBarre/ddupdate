@@ -117,8 +117,7 @@ fi
 
 # Fetching IP Address
 $DEBUG && output "Fetching IP using URL=$CHECK_IP_URL"
-#IPADDRESS=$(curl -s $CHECK_IP_URL | sed 's/^.*: \([^<]*\).*$/\1/')
-IPADDRESS=127.0.0.1
+#IPADDRESS=127.0.0.1
 $DEBUG && output "got IP=$IPADDRESS"
 testIPv4 $IPADDRESS
 
