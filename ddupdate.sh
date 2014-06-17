@@ -107,7 +107,7 @@ CACHEFILE="$CACHEDIR/${CONFIGFILE##*/}.cache"
 if [[ ! -f "$CACHEFILE" ]]; then
   $DEBUG && ourput "Creating cache file $CACHEFILE .."
   touch "$CACHEFILE"
-  $0 && { output "Could not create $CACHEFILE" $ERROR; exit 1; }
+  $? && { output "Could not create $CACHEFILE" $ERROR; exit 1; }
 elif [[ ! -w "$CACHEFILE" ]]; then
   output "cache fil $CACHEFILE is not writable" $ERROR
   exit 1
@@ -125,29 +125,39 @@ fi
 $DEBUG && output "got IP=$IPADDRESS"
 testIPv4 $IPADDRESS
 
-# Check to see if the IP has changed since last run
-. $CACHEFILE
-if [[ "$IPADDRESS" == "$IPADDRESS_LASTRUN" ]]; then
-    ($DEBUG || $VERBOSE) && output "IP Address hasn't changed : $IPADDRESS"
-    $DEBUG && output "Finished run.."
-    exit 0;
-fi
-
-($DEBUG || $VERBOSE) && output "IP change detected: $IPADDRESS_LASTRUN -> $IPADDRESS"
-$DEBUG && output "Updating $CACHEFILE with $IPADDRESS"
-echo "IPADDRESS_LASTRUN=$IPADDRESS" > $CACHEFILE || { output "Error while writing to $CACHEFILE" $ERROR; exit 1; }
-
 #Start the updating loop
 for HOST in ${HOSTS[@]}; do
-  # create the URL
-  UPDATE_DNS_URL_HOST=$(sed -e "s/{A-RECORD}/$HOST/g" -e "s/{IP}/$IPADDRESS/g" <<< $UPDATE_DNS_URL)
-  $DEBUG && output "Update $HOST\t-> $IPADDRESS\t URL=$UPDATE_DNS_URL_HOST"
-  RESPONSE=$(curl -s --user "$USERNAME:$PASSWORD" "$UPDATE_DNS_URL_HOST")
-  if [[ "$RESPONSE" != "good" ]]; then
-    if [[ "$RESPONSE" == "nochg" ]]; then
-      output "Got nochg while updating $HOST -> $IPADDRESS  If this continues you may be blocked" $ERROR
+  # Get the values from cache file
+  IP_CACHE=$(grep "host=$HOST" $CACHEFILE | sed 's/.*ip=\([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/')
+  if [[ "IPADDRESS" == "$IPCACHE" ]]; then
+    ($DEBUG || $VERBOSE) && output "IP Address hasn't changed : $IPADDRESS"
+  else
+    # create the URL
+    UPDATE_DNS_URL_HOST=$(sed -e "s/{A-RECORD}/$HOST/g" -e "s/{IP}/$IPADDRESS/g" <<< $UPDATE_DNS_URL)
+    $DEBUG && output "Update $HOST\t-> $IPADDRESS\t URL=$UPDATE_DNS_URL_HOST"
+    $VERBOSE && output "Update $HOST\t-> $IPADDRESS\t"
+    RESPONSE=$(curl -s --user "$USERNAME:$PASSWORD" "$UPDATE_DNS_URL_HOST")
+    if [[ "$RESPONSE" == "good" ]]; then
+      ## updating cache
+      $DEBUG && output "updating cache file"
+      CACHE_COUNT=$(grep --count "host=$HOST")
+      if [[ $CACHE_COUNT == 0 ]]; then
+        $DEBUG && output "creating new cache entry for $HOST, ip=$IPADDRESS"
+        echo "host=$HOST,ip=$IPADDRESS" >> $CACHEFILE
+        $? && output "error updating cache file" $ERROR
+      else
+        sed -i "s/^.*host=${HOST}.*$/host=${HOST},ip=$IPADDRESS/g" $CACHEFILE
+        $? && output "error updating cache file" $ERROR
+      fi
+      if [[ $CACHE_COUNT > 1 ]];then
+        output "Duplicate cache entries found for $HOST" $ERROR
+      fi
     else
-      output "Got error while updating $HOST -> $IPADDRESS : $RESPONSE" $ERROR
+      if [[ "$RESPONSE" == "nochg" ]]; then
+        output "Got nochg while updating $HOST -> $IPADDRESS  If this continues you may be blocked" $ERROR
+      else
+        output "Got error while updating $HOST -> $IPADDRESS : $RESPONSE" $ERROR
+      fi
     fi
   fi
 done
