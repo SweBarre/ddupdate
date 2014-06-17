@@ -106,8 +106,7 @@ $DEBUG && output "Checking mandatory variables...."
 CACHEFILE="$CACHEDIR/${CONFIGFILE##*/}.cache"
 if [[ ! -f "$CACHEFILE" ]]; then
   $DEBUG && ourput "Creating cache file $CACHEFILE .."
-  touch "$CACHEFILE"
-  $? && { output "Could not create $CACHEFILE" $ERROR; exit 1; }
+  touch "$CACHEFILE" || { output "Could not create $CACHEFILE" $ERROR; exit 1; }
 elif [[ ! -w "$CACHEFILE" ]]; then
   output "cache fil $CACHEFILE is not writable" $ERROR
   exit 1
@@ -128,7 +127,9 @@ testIPv4 $IPADDRESS
 #Start the updating loop
 for HOST in ${HOSTS[@]}; do
   # Get the values from cache file
+  $DEBUG && output "Checking host=$HOST"
   IP_CACHE=$(grep "host=$HOST" $CACHEFILE | sed 's/.*ip=\([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/')
+  $DEBUG && output "Cached IP=$IP_CACHE"
   if [[ "IPADDRESS" == "$IPCACHE" ]]; then
     ($DEBUG || $VERBOSE) && output "IP Address hasn't changed : $IPADDRESS"
   else
@@ -136,18 +137,17 @@ for HOST in ${HOSTS[@]}; do
     UPDATE_DNS_URL_HOST=$(sed -e "s/{A-RECORD}/$HOST/g" -e "s/{IP}/$IPADDRESS/g" <<< $UPDATE_DNS_URL)
     $DEBUG && output "Update $HOST\t-> $IPADDRESS\t URL=$UPDATE_DNS_URL_HOST"
     $VERBOSE && output "Update $HOST\t-> $IPADDRESS\t"
-    RESPONSE=$(curl -s --user "$USERNAME:$PASSWORD" "$UPDATE_DNS_URL_HOST")
+    #RESPONSE=$(curl -s --user "$USERNAME:$PASSWORD" "$UPDATE_DNS_URL_HOST")
+    RESPONSE="good"
     if [[ "$RESPONSE" == "good" ]]; then
       ## updating cache
       $DEBUG && output "updating cache file"
-      CACHE_COUNT=$(grep --count "host=$HOST")
+      CACHE_COUNT=$(grep --count "host=$HOST" $CACHEFILE)
       if [[ $CACHE_COUNT == 0 ]]; then
         $DEBUG && output "creating new cache entry for $HOST, ip=$IPADDRESS"
-        echo "host=$HOST,ip=$IPADDRESS" >> $CACHEFILE
-        $? && output "error updating cache file" $ERROR
+        echo "host=$HOST,ip=$IPADDRESS" >> $CACHEFILE || output "error updating cache file" $ERROR
       else
-        sed -i "s/^.*host=${HOST}.*$/host=${HOST},ip=$IPADDRESS/g" $CACHEFILE
-        $? && output "error updating cache file" $ERROR
+        sed -i "s/^.*host=${HOST}.*$/host=${HOST},ip=$IPADDRESS/g" $CACHEFILE || output "error updating cache file" $ERROR
       fi
       if [[ $CACHE_COUNT > 1 ]];then
         output "Duplicate cache entries found for $HOST" $ERROR
