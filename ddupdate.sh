@@ -117,8 +117,11 @@ fi
 
 # Fetching IP Address
 $DEBUG && output "Fetching IP using URL=$CHECK_IP_URL"
-#IPADDRESS=$(curl -s $CHECK_IP_URL | sed 's/^.*: \([^<]*\).*$/\1/')
-IPADDRESS=127.0.0.1
+# fetching the IP and filter out unwanted HTML-tags
+IPADDRESS=$(curl -s $CHECK_IP_URL | sed -e 's/<title>.*<\/title>//' -e 's/<[^>]\+>//g')
+if [[ ! -z $IPFILTER ]]; then
+  IPADDRESS=$(echo $IPADDRESS | sed "$IPFILTER")
+fi
 $DEBUG && output "got IP=$IPADDRESS"
 testIPv4 $IPADDRESS
 
@@ -149,4 +152,5 @@ for HOST in ${HOSTS[@]}; do
   fi
 done
 
+$DEBUG && output "Finished run.."
 exit 0
