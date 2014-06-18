@@ -15,8 +15,6 @@ function printHelp {
 DEBUG=/bin/false
 VERBOSE=/bin/false
 CACHEFILE=/tmp/
-SCRIPTPATH=${0%/*}
-SCRIPTNAME=${0##*/}
 ERROR=/bin/true
 
 function output {
