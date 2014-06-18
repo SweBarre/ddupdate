@@ -142,7 +142,7 @@ for HOST in ${HOSTS[@]}; do
     $DEBUG && output "Update $HOST\t-> $IPADDRESS\t URL=$UPDATE_DNS_URL_HOST"
     $VERBOSE && output "Update $HOST\t-> $IPADDRESS\t"
     RESPONSE=$(curl $SILENT_CURL --user "$USERNAME:$PASSWORD" "$UPDATE_DNS_URL_HOST")
-    if [[ "$RESPONSE" == "good" ]]; then
+    if [[ "$RESPONSE" == "good" || "$RESPONSE" == "nochg" ]]; then
       ## updating cache
       $DEBUG && output "updating cache file"
       CACHE_COUNT=$(grep --count "host=$HOST" $CACHEFILE)
@@ -155,12 +155,11 @@ for HOST in ${HOSTS[@]}; do
       if [[ $CACHE_COUNT > 1 ]];then
         output "Duplicate cache entries found for $HOST" $ERROR
       fi
+    fi
+    if [[ "$RESPONSE" == "nochg" ]]; then
+      output "Got nochg while updating $HOST -> $IPADDRESS  If this continues you may be blocked" $ERROR
     else
-      if [[ "$RESPONSE" == "nochg" ]]; then
-        output "Got nochg while updating $HOST -> $IPADDRESS  If this continues you may be blocked" $ERROR
-      else
-        output "Got error while updating $HOST -> $IPADDRESS : $RESPONSE" $ERROR
-      fi
+      output "Got error while updating $HOST -> $IPADDRESS : $RESPONSE" $ERROR
     fi
   fi
 done
