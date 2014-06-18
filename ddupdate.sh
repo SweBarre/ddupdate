@@ -15,8 +15,6 @@ function printHelp {
 DEBUG=/bin/false
 VERBOSE=/bin/false
 CACHEFILE=/tmp/
-SCRIPTPATH=${0%/*}
-SCRIPTNAME=${0##*/}
 ERROR=/bin/true
 
 function output {
@@ -121,7 +119,7 @@ fi
 # Fetching IP Address
 $DEBUG && output "Fetching IP using URL=$CHECK_IP_URL"
 # fetching the IP and filter out unwanted HTML-tags
-IPADDRESS=$(curl $SILENT_CURL $CHECK_IP_URL | sed -e 's/<title>.*<\/title>//' -e 's/<[^>]\+>//g')
+IPADDRESS=$(curl $SILENT_CURL $CHECK_IP_URL | sed -e 's/<title>.*<\/title>//I' -e 's/<[^>]\+>//g')
 if [[ ! -z $IPFILTER ]]; then
   IPADDRESS=$(echo $IPADDRESS | sed "$IPFILTER")
 fi
