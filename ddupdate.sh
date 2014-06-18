@@ -92,6 +92,10 @@ if [[ ! -r "$CONFIGFILE" ]]; then
 fi
 . "$CONFIGFILE"
 
+# Check if DEBUG and if curl output should be silent or not
+SILENT_CURL="-s"
+$DEBUG && SILENT_CURL=""
+
 #Check to see if we have all the variables we need.
 $DEBUG && output "Checking mandatory variables...."
 [[ -z "$CHECK_IP_URL" ]] && { output "CHECK_IP_URL not set" $ERROR; exit 1; }
@@ -117,7 +121,7 @@ fi
 # Fetching IP Address
 $DEBUG && output "Fetching IP using URL=$CHECK_IP_URL"
 # fetching the IP and filter out unwanted HTML-tags
-IPADDRESS=$(curl -s $CHECK_IP_URL | sed -e 's/<title>.*<\/title>//' -e 's/<[^>]\+>//g')
+IPADDRESS=$(curl $SILENT_CURL $CHECK_IP_URL | sed -e 's/<title>.*<\/title>//' -e 's/<[^>]\+>//g')
 if [[ ! -z $IPFILTER ]]; then
   IPADDRESS=$(echo $IPADDRESS | sed "$IPFILTER")
 fi
@@ -130,15 +134,14 @@ for HOST in ${HOSTS[@]}; do
   $DEBUG && output "Checking host=$HOST"
   IP_CACHE=$(grep "host=$HOST" $CACHEFILE | sed 's/.*ip=\([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/')
   $DEBUG && output "Cached IP=$IP_CACHE"
-  if [[ "IPADDRESS" == "$IPCACHE" ]]; then
-    ($DEBUG || $VERBOSE) && output "IP Address hasn't changed : $IPADDRESS"
+  if [[ "$IPADDRESS" == "$IP_CACHE" ]]; then
+    ($DEBUG || $VERBOSE) && output "$HOST IP Address hasn't changed : $IPADDRESS"
   else
     # create the URL
     UPDATE_DNS_URL_HOST=$(sed -e "s/{A-RECORD}/$HOST/g" -e "s/{IP}/$IPADDRESS/g" <<< $UPDATE_DNS_URL)
     $DEBUG && output "Update $HOST\t-> $IPADDRESS\t URL=$UPDATE_DNS_URL_HOST"
     $VERBOSE && output "Update $HOST\t-> $IPADDRESS\t"
-    #RESPONSE=$(curl -s --user "$USERNAME:$PASSWORD" "$UPDATE_DNS_URL_HOST")
-    RESPONSE="good"
+    RESPONSE=$(curl $SILENT_CURL --user "$USERNAME:$PASSWORD" "$UPDATE_DNS_URL_HOST")
     if [[ "$RESPONSE" == "good" ]]; then
       ## updating cache
       $DEBUG && output "updating cache file"
