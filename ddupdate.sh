@@ -92,6 +92,10 @@ if [[ ! -r "$CONFIGFILE" ]]; then
 fi
 . "$CONFIGFILE"
 
+# Check if DEBUG and if curl output should be silent or not
+SILENT_CURL="-s"
+$DEBUG && SILENT_CURL=""
+
 #Check to see if we have all the variables we need.
 $DEBUG && output "Checking mandatory variables...."
 [[ -z "$CHECK_IP_URL" ]] && { output "CHECK_IP_URL not set" $ERROR; exit 1; }
@@ -106,8 +110,7 @@ $DEBUG && output "Checking mandatory variables...."
 CACHEFILE="$CACHEDIR/${CONFIGFILE##*/}.cache"
 if [[ ! -f "$CACHEFILE" ]]; then
   $DEBUG && ourput "Creating cache file $CACHEFILE .."
-  touch "$CACHEFILE"
-  $0 && { output "Could not create $CACHEFILE" $ERROR; exit 1; }
+  touch "$CACHEFILE" || { output "Could not create $CACHEFILE" $ERROR; exit 1; }
 elif [[ ! -w "$CACHEFILE" ]]; then
   output "cache fil $CACHEFILE is not writable" $ERROR
   exit 1
@@ -118,36 +121,46 @@ fi
 # Fetching IP Address
 $DEBUG && output "Fetching IP using URL=$CHECK_IP_URL"
 # fetching the IP and filter out unwanted HTML-tags
-IPADDRESS=$(curl -s $CHECK_IP_URL | sed -e 's/<title>.*<\/title>//' -e 's/<[^>]\+>//g')
+IPADDRESS=$(curl $SILENT_CURL $CHECK_IP_URL | sed -e 's/<title>.*<\/title>//' -e 's/<[^>]\+>//g')
 if [[ ! -z $IPFILTER ]]; then
   IPADDRESS=$(echo $IPADDRESS | sed "$IPFILTER")
 fi
 $DEBUG && output "got IP=$IPADDRESS"
 testIPv4 $IPADDRESS
 
-# Check to see if the IP has changed since last run
-. $CACHEFILE
-if [[ "$IPADDRESS" == "$IPADDRESS_LASTRUN" ]]; then
-    ($DEBUG || $VERBOSE) && output "IP Address hasn't changed : $IPADDRESS"
-    $DEBUG && output "Finished run.."
-    exit 0;
-fi
-
-($DEBUG || $VERBOSE) && output "IP change detected: $IPADDRESS_LASTRUN -> $IPADDRESS"
-$DEBUG && output "Updating $CACHEFILE with $IPADDRESS"
-echo "IPADDRESS_LASTRUN=$IPADDRESS" > $CACHEFILE || { output "Error while writing to $CACHEFILE" $ERROR; exit 1; }
-
 #Start the updating loop
 for HOST in ${HOSTS[@]}; do
-  # create the URL
-  UPDATE_DNS_URL_HOST=$(sed -e "s/{A-RECORD}/$HOST/g" -e "s/{IP}/$IPADDRESS/g" <<< $UPDATE_DNS_URL)
-  $DEBUG && output "Update $HOST\t-> $IPADDRESS\t URL=$UPDATE_DNS_URL_HOST"
-  RESPONSE=$(curl -s --user "$USERNAME:$PASSWORD" "$UPDATE_DNS_URL_HOST")
-  if [[ "$RESPONSE" != "good" ]]; then
-    if [[ "$RESPONSE" == "nochg" ]]; then
-      output "Got nochg while updating $HOST -> $IPADDRESS  If this continues you may be blocked" $ERROR
+  # Get the values from cache file
+  $DEBUG && output "Checking host=$HOST"
+  IP_CACHE=$(grep "host=$HOST" $CACHEFILE | sed 's/.*ip=\([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/')
+  $DEBUG && output "Cached IP=$IP_CACHE"
+  if [[ "$IPADDRESS" == "$IP_CACHE" ]]; then
+    ($DEBUG || $VERBOSE) && output "$HOST IP Address hasn't changed : $IPADDRESS"
+  else
+    # create the URL
+    UPDATE_DNS_URL_HOST=$(sed -e "s/{A-RECORD}/$HOST/g" -e "s/{IP}/$IPADDRESS/g" <<< $UPDATE_DNS_URL)
+    $DEBUG && output "Update $HOST\t-> $IPADDRESS\t URL=$UPDATE_DNS_URL_HOST"
+    $VERBOSE && output "Update $HOST\t-> $IPADDRESS\t"
+    RESPONSE=$(curl $SILENT_CURL --user "$USERNAME:$PASSWORD" "$UPDATE_DNS_URL_HOST")
+    if [[ "$RESPONSE" == "good" ]]; then
+      ## updating cache
+      $DEBUG && output "updating cache file"
+      CACHE_COUNT=$(grep --count "host=$HOST" $CACHEFILE)
+      if [[ $CACHE_COUNT == 0 ]]; then
+        $DEBUG && output "creating new cache entry for $HOST, ip=$IPADDRESS"
+        echo "host=$HOST,ip=$IPADDRESS" >> $CACHEFILE || output "error updating cache file" $ERROR
+      else
+        sed -i "s/^.*host=${HOST}.*$/host=${HOST},ip=$IPADDRESS/g" $CACHEFILE || output "error updating cache file" $ERROR
+      fi
+      if [[ $CACHE_COUNT > 1 ]];then
+        output "Duplicate cache entries found for $HOST" $ERROR
+      fi
     else
-      output "Got error while updating $HOST -> $IPADDRESS : $RESPONSE" $ERROR
+      if [[ "$RESPONSE" == "nochg" ]]; then
+        output "Got nochg while updating $HOST -> $IPADDRESS  If this continues you may be blocked" $ERROR
+      else
+        output "Got error while updating $HOST -> $IPADDRESS : $RESPONSE" $ERROR
+      fi
     fi
   fi
 done
