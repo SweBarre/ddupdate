@@ -2,7 +2,7 @@ ddupdate
 ========
 
 Script for dynamicly updating DynDNS
-I had some problem using ddclient with requently nochg responses
+I had some problem using ddclient with frequently nochg responses
 due to the fact that the ip address wasn't written to the cache 
 file.
 
