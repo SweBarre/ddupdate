@@ -5,9 +5,9 @@ function printHelp {
   echo "Usage
   ${0##*/} -c <config file> [-v -h -d]
 
-    -c <config file>	:	use configu file
+    -c <config file>	:	use config file
     -v			:	verbose output
-    -d			:	print debud info
+    -d			:	print debug info
     -h 			:	print this help"
     
 }
@@ -100,7 +100,6 @@ $DEBUG && output "Checking mandatory variables...."
 [[ -z "$UPDATE_DNS_URL" ]] && { ouput "UPDATE_DNS_URL not set" $ERROR; exit 1; }
 [[ -z "$USERNAME" ]] && { output "USERNAME not set" $ERROR; exit 1; }
 [[ -z "$PASSWORD" ]] && { output "PASSWORD not set" $ERROR; exit 1; }
-[[ -z "$HOSTS" ]] && { output "HOSTS not set" $ERROR; exit 1; }
 [[ -z "$HOSTS" ]] && { output "HOSTS not set" $ERROR; exit 1; }
 [[ -z "$CACHEDIR" ]] && { output "CACHEDIR not set" $ERROR; exit 1; }
 
