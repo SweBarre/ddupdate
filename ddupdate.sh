@@ -106,7 +106,7 @@ $DEBUG && output "Checking mandatory variables...."
 # Checking cache file
 CACHEFILE="$CACHEDIR/${CONFIGFILE##*/}.cache"
 if [[ ! -f "$CACHEFILE" ]]; then
-  $DEBUG && ourput "Creating cache file $CACHEFILE .."
+  $DEBUG && output "Creating cache file $CACHEFILE .."
   touch "$CACHEFILE" || { output "Could not create $CACHEFILE" $ERROR; exit 1; }
 elif [[ ! -w "$CACHEFILE" ]]; then
   output "cache fil $CACHEFILE is not writable" $ERROR
